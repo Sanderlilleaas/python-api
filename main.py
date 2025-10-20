@@ -34,16 +34,30 @@ async def run_python(req: Request, auth: str | None = Header(None)):
         "stdin": "",
     }
 
-    # Kall Piston trygt
+    # Kall Piston trygt og returner ALDRI 500 til klienten pga parsing
     try:
         async with httpx.AsyncClient(timeout=30) as client:
             resp = await client.post(PISTON_URL, json=piston_body)
-            # Ikke crash ved 4xx/5xx – returner feilen i JSON i stedet
             status = resp.status_code
-            text = await resp.aread()
+            raw = await resp.aread()
             try:
-                data = json.loads(text.decode("utf-8", errors="ignore"))
+                data = json.loads(raw.decode("utf-8", errors="ignore"))
             except Exception:
-                data = {"raw": text.decode("utf-8", errors="ignore")}
+                data = {"raw": raw.decode("utf-8", errors="ignore")}
     except Exception as e:
-        # Net
+        # Nettverksfeil / DNS / timeout etc.
+        return {"error": "piston_request_failed", "details": str(e)}
+
+    run = data.get("run", {}) if isinstance(data, dict) else {}
+
+    # Returner både strukturert og rå info (lett å debugge i n8n)
+    return {
+        "status": status,
+        "result": {
+            "stdout": run.get("stdout", ""),
+            "stderr": run.get("stderr", ""),
+            "code": run.get("code", None),
+            "output": run.get("output", None),
+        },
+        "piston_raw": data
+    }
