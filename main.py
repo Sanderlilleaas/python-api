@@ -29,9 +29,5 @@ async def run_python(req: Request, auth: str | None = Header(None)):
         r.raise_for_status()
         out = r.json()
 
-    try:
-        parsed = json.loads(out.get("run", {}).get("stdout", "") or "{}")
-    except Exception:
-        raise HTTPException(status_code=500, detail="stdout not JSON")
-
-    return {"result": parsed}
+    # Return plain stdout instead of parsing JSON
+    return {"stdout": out.get("run", {}).get("stdout", "")}
